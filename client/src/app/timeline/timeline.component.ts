@@ -1,4 +1,5 @@
 import { Component, OnInit, HostListener } from '@angular/core';
+import { Label } from './label'; // Adjust the path based on your project structure
 import { TimelineDataService, EventData} from './timeline-data.service';
 import { catchError, map } from 'rxjs/operators';
 import { EMPTY } from 'rxjs';
@@ -10,6 +11,7 @@ import { EMPTY } from 'rxjs';
 })
 export class TimelineComponent implements OnInit {
   private timelineData: EventData[] = [];
+  private labels: Label[] = [];
   private zoomFactor = 0.1;
   private isDragging = false;
   private dragStartX = 0;
@@ -53,6 +55,7 @@ export class TimelineComponent implements OnInit {
   private updateTimelineData() {
     let duration = this.maxYear - this.minYear;
     const padding = duration * 0.25;
+    const ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     let beginYear = this.minYear - padding;
     let endYear = this.maxYear + padding;
     this.timelineDataService
@@ -72,6 +75,9 @@ export class TimelineComponent implements OnInit {
       )
       .subscribe((x) => {
         this.timelineData = x;
+        this.labels = x.map((event: EventData) => {
+          return new Label(event, this.maxWidth, ctx);
+        });
         this.drawTimeline();
       });
   }
@@ -85,23 +91,6 @@ export class TimelineComponent implements OnInit {
     this.canvas.height = window.innerHeight;
   }
 
-  showWikipediaContent(event: any) {
-    this.currentEvent = event;
-    this.timelineDataService.getWikipediaContent(event.page_url).subscribe(
-      (content: string) => {
-        this.wikipediaContent = content;
-        this.showContent = true;
-      },
-      (error) => {
-        console.error('Error fetching Wikipedia content:', error);
-      }
-    );
-  }
-
-  hideWikipediaContent() {
-    this.showContent = false;
-  }
-  
   private drawTimeline() {
     const ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
 
@@ -128,6 +117,7 @@ export class TimelineComponent implements OnInit {
       ctx.stroke();
     };
 
+    // To remove
     const breakTextIntoLines = (text: string, maxWidth: number): string[] => {
       const words = text.split(' ');
       const lines: string[] = [];
@@ -152,6 +142,7 @@ export class TimelineComponent implements OnInit {
       return lines;
     };
 
+    // To remove
     const makeLabel = (event: EventData, maxWidth: number): string[] => {
       const titleLines = breakTextIntoLines(event.title, maxWidth);
       const authorLines = breakTextIntoLines(
@@ -176,37 +167,33 @@ export class TimelineComponent implements OnInit {
       return label.length * textIncr + this.vertLabelGap;
     };
 
-    const djb2 = (str: string) => {
-      var hash = 5381;
-      for (var i = 0; i < str.length; i++) {
-        hash = ((hash << 5) + hash) + str.charCodeAt(i); /* hash * 33 + c */
-      }
-      return hash;
-    }
-    
-    const hashStringToColor = (str: string) => {
-      var hash = djb2(str);
-      var r = (hash & 0xFF0000) >> 16;
-      var g = (hash & 0x00FF00) >> 8;
-      var b = hash & 0x0000FF;
-      return "#" + ("0" + r.toString(16)).substr(-2) + ("0" + g.toString(16)).substr(-2) + ("0" + b.toString(16)).substr(-2);
-    }
-
     const drawLabel = (event: EventData) => {
       if (!event.location) return;
+
+      const label = new Label(
+        event,
+        this.maxWidth,
+        this.canvas.getContext('2d') as CanvasRenderingContext2D
+      );
       const loc = event.location;
-      const label = makeLabel(event, this.maxWidth);
-      ctx.save();
-      ctx.textAlign = 'center';
-      // ctx.font = '12px'
-      ctx.fillStyle = hashStringToColor(event.author);
-      label.forEach((row: string, index: number) => {
-        ctx.fillText(row, loc.x, loc.y + index * textIncr);
-      });
-      const height = label.length * textIncr;
+
+      let height = 0;
+      if (true) {
+        label.draw();
+        height = label.height;
+      } else {
+        const labelLines = makeLabel(event, this.maxWidth);
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'black';
+        labelLines.forEach((row: string, index: number) => {
+          ctx.fillText(row, loc.x, loc.y + index * textIncr);
+        });
+        ctx.restore();
+        height = labelLines.length * textIncr;
+      }
 
       drawTickmark(loc.x, loc.y + height);
-      ctx.restore();
     };
 
     const drawBand = (
