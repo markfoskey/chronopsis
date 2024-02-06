@@ -4,11 +4,16 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 export interface EventData {
-  OldYear: string;
   title: string;
-  importance: number;
-  year: number;
   author: string;
+  year: number;
+  day_in_year: number;
+  pubdate: string;
+  genre: string;
+  country: string;
+  in_links: number;
+  article_length: number;
+  page_url: string;
   width: number;
   location: { x: number; y: number };
 }
