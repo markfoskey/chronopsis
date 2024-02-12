@@ -108,15 +108,46 @@ def get_page_info(page):
 
     return [title, author, year, day_in_year, pubdate, genre, country, in_links, article_length, page.url]
 
-def scrape_category_recursive(wiki_wiki, category_name, depth=5):
+def traverse_category(wiki_wiki, category_name, depth=5):
+    print("starting category_tree")
     start_time = time.time()
     category_tree = wiki_wiki.categorytree(category_name, depth=depth)
     end_time = time.time()
     print(f"categorytree took {end_time - start_time} seconds")
+    return category_tree
+
+# List of leaves of the tree (page titles - e.g., "Dune (novel)")
+def save_category_tree(wiki_wiki, category_name, depth=5):
+    category_tree = traverse_category(wiki_wiki, category_name, depth)
+
+    def process_category_tree(tree, file, curr_depth):
+        for category, details in tree.items():
+            print(f"Processing category {category} at current depth {curr_depth}.")
+
+            if details is None:
+                return
+
+            if 'links' in details:
+                for link in details['links']:
+                    file.write(f"{link}\n")
+
+            if 'sub-categories' in details:
+                process_category_tree(details['sub-categories'], file, curr_depth + 1)
+
+    output_filename = f'{category_name}_novels_links.txt'
+    with open(output_filename, 'w', newline='', encoding='utf-8') as file:
+        process_category_tree(category_tree, file, 0)
+
+    print(f"Data written to '{output_filename}'")
+
+    return 
+
+def scrape_category_recursive(wiki_wiki, category_name, depth=5):
+    category_tree = traverse_category(wiki_wiki, category_name, depth)
 
     def process_category_tree(tree, csv_writer, curr_depth):
         for category, details in tree.items():
-            print(f"Processing category {category}.")
+            print(f"Processing category {category} at current depth {curr_depth}.")
 
             if details is None:
                 return
@@ -157,7 +188,7 @@ def scrape_category_recursive(wiki_wiki, category_name, depth=5):
 
     print(f"Data written to '{output_filename}'")
 
-    return  # You may or may not need to return novels_data, depending on your requirements
+    return 
 
 def write_to_csv(data, filename):
     filename += ".csv"
@@ -172,16 +203,7 @@ def write_to_csv(data, filename):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Parser for novels Wiki scraper.')
     parser.add_argument('category_name', type=str, help='Name of the Wikipedia category')
-
     args = parser.parse_args()
     category_name = args.category_name
-
     wikipedia = MediaWiki(user_agent='NovelScraperBot/1.0 (mark.foskey@gmail.com) pymediawiki/0.7.3')
-    scrape_category_recursive(wikipedia, category_name, depth=5)
-
-    # if novels_data:
-    #     write_to_csv(novels_data, category_name)
-    # else:
-    #     print("No data found.")
-
-    
+    save_category_tree(wikipedia, category_name, depth=5)
