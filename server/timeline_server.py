@@ -29,7 +29,8 @@ def get_events():
 
     return jsonify(filtered_events)
 
-novels_file = 'BritishNovels.csv'
+novels_file = 'BritishAndAmericanNovels.csv'
+# novels_file = 'BritishNovels.csv'
 # novels_file = 'test.csv'
 
 print("Reading data... ")

@@ -12,8 +12,8 @@ args = arg_parser.parse_args()
 infile = args.infile
 outfile = args.outfile
 
-# Read the CSV file, treating 'Year' column as strings
-df = pd.read_csv(infile, dtype={'Year': str})
+# Read the CSV file, treating 'year' column as strings
+df = pd.read_csv(infile, dtype={'year': str})
 
 # Function to extract the first contiguous four digits from a string
 def extract_year(date_string):
@@ -52,18 +52,20 @@ def get_date(date_string):
 
 # Function to update the "Year" column
 def update_year(row):
-    date = row['Year']
+    date = str(row['year'])
     if date is None or date.isdigit() and 1500 <= int(date) <= 2100:
         return row  # No modification needed for valid years or None
-    return pd.Series({'Author': row['Author'], 'Title': row['Title'], 'Word Count': row['Word Count'],
-                      'Year': extract_year(date), 'Old Year': date})
+    return pd.Series({'author': row['author'], 'title': row['title'], 'article_length': row['article_length'],
+                      'year': extract_year(date), 'pubdate': date})
+
+# 'title', 'author', 'year', 'day_in_year', 'pubdate', 'genre', 'country', 'in_links', 'article_length', 'page_url'
 
 # Apply the update_year function to each row and create a new DataFrame
 # df_updated = df.apply(lambda row: update_year(row), axis=1)
 df_updated = df.apply(update_year, axis=1)
 
 # Reorder columns
-df_updated = df_updated[['Author', 'Title', 'Year', 'Word Count', 'Old Year']]
+df_updated = df_updated[['author', 'title', 'year', 'article_length', 'pubdate']]
 
 # Save the updated DataFrame to a new CSV file
 df_updated.to_csv(outfile, index=False, encoding='utf-8')

@@ -16,9 +16,11 @@ export class TimelineComponent implements OnInit {
   private zoomFactor = 0.1;
   private isDragging = false;
   private dragStartX = 0;
+  private dragStartY = 0;
   private leftPixel = 0;
   private rightPixel = 0;
   private timelineY = 0;
+  private labelBase = 0;
   private tickRadius = 0;
   private vertLabelGap = 0;
   private horizLabelGap = 0;
@@ -39,6 +41,7 @@ export class TimelineComponent implements OnInit {
     this.leftPixel = -200;
     this.rightPixel = this.canvas.width + 200;
     this.timelineY = this.canvas.height - 115;
+    this.labelBase = this.timelineY - 5;
     this.tickRadius = 3;
     this.vertLabelGap = 36;
     this.horizLabelGap = 8;
@@ -183,7 +186,7 @@ export class TimelineComponent implements OnInit {
     
       label.font = `${fontSize}px helvetica`;
       label.setX(this.minYear, this.maxYear, this.leftPixel, this.rightPixel);
-      label.setY(shownLabels, this.timelineY);
+      label.setY(shownLabels, this.labelBase);
 
       label.draw();
       shownLabels.push(label);
@@ -195,6 +198,7 @@ export class TimelineComponent implements OnInit {
   onMouseDown(event: MouseEvent) {
     this.isDragging = true;
     this.dragStartX = event.clientX;
+    this.dragStartY = event.clientY;
   }
 
   // Handle mouse move event to pan the timeline
@@ -202,7 +206,9 @@ export class TimelineComponent implements OnInit {
   onMouseMove(event: MouseEvent) {
     if (this.isDragging) {
       const deltaX = event.clientX - this.dragStartX;
+      const deltaY = event.clientY - this.dragStartY;
       this.dragStartX = event.clientX;
+      this.dragStartY = event.clientY;
 
       // Adjust the visible portion of the timeline based on deltaX
       const deltaYear = rescale(
@@ -214,6 +220,8 @@ export class TimelineComponent implements OnInit {
       );
       this.minYear -= deltaYear;
       this.maxYear -= deltaYear;
+
+      this.labelBase += deltaY;
 
       // Redraw the timeline with the updated visible portion
       this.drawTimeline();
@@ -232,7 +240,7 @@ export class TimelineComponent implements OnInit {
   }
 
   // Handle mouse wheel events for zooming
-  @HostListener('mousewheel', ['$event'])
+  @HostListener('wheel', ['$event'])
   onMouseWheel(event: WheelEvent) {
     // Scrolling up --> zooming in --> min and max years closer together
     const zoomMultiplier =
@@ -245,11 +253,12 @@ export class TimelineComponent implements OnInit {
     // Redraw the timeline with the updated scale
     this.drawTimeline();
     this.updateTimelineData();
+    return false;
   }
 
   @HostListener('click', ['$event'])
   onClick(event: MouseEvent) {
-    this.isDragging = false;
+    if (this.isDragging) return;
     this.labels.forEach(label => label.openPageIfClicked(event.clientX, event.clientY));
   }
 

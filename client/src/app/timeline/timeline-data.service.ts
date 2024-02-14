@@ -22,8 +22,8 @@ export interface EventData {
   providedIn: 'root',
 })
 export class TimelineDataService {
-  // private baseUrl = 'http://localhost:5500';  // Update with your server URL
-  private baseUrl = 'https://mightcould.pythonanywhere.com/';  // Update with your server URL
+  private baseUrl = 'http://localhost:5500';  // Update with your server URL
+  // private baseUrl = 'https://mightcould.pythonanywhere.com/';  // Update with your server URL
   constructor(private http: HttpClient) {}
 
   getEvents(startYear: number, endYear: number, locationMin: number, locationMax: number, maxEvents: number): Observable<any[]> {
