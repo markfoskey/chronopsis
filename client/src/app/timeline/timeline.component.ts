@@ -17,6 +17,8 @@ export class TimelineComponent implements OnInit {
   private isDragging = false;
   private dragStartX = 0;
   private dragStartY = 0;
+  private dragPrevX = 0;
+  private dragPrevY = 0;
   private leftPixel = 0;
   private rightPixel = 0;
   private timelineY = 0;
@@ -27,8 +29,6 @@ export class TimelineComponent implements OnInit {
   private minYear = 0;
   private maxYear = 0;
   private maxWidth = 150;
-  public showContent = false;
-  public wikipediaContent = '';
   public currentEvent = {} as EventData;
 
   private canvas!: HTMLCanvasElement; // Canvas reference
@@ -63,7 +63,7 @@ export class TimelineComponent implements OnInit {
     let beginYear = this.minYear - padding;
     let endYear = this.maxYear + padding;
     this.timelineDataService
-      .getEvents(beginYear, endYear, 0, 10, 400)
+      .getEvents(beginYear, endYear, 0, 10, 1000)
       .pipe(
         map((data) => {
           data.map((event: EventData) => {
@@ -93,6 +93,8 @@ export class TimelineComponent implements OnInit {
     ) as HTMLCanvasElement;
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
+    let overlay = document.getElementById('overlay');
+    overlay?.addEventListener('mouseup', (event) => { this.isDragging = false; })
   }
 
   private drawTimeline() {
@@ -123,7 +125,7 @@ export class TimelineComponent implements OnInit {
       ctx.save();
       ctx.fillStyle = 'black';
       ctx.textAlign = 'start';
-      ctx.font = '24px Garamond'; // Adjust the font size and font family as needed
+      ctx.font = '24px Garamond';
       ctx.fillText(year, startX + 5, this.timelineY - 5);
       ctx.restore();
     };
@@ -146,8 +148,7 @@ export class TimelineComponent implements OnInit {
       drawBand(startX, bandWidth, year, color);
     }
 
-    // Use labels in place of events
-    // Sort events in decreasing order of importance
+    // Sort labels in decreasing order of importance
     const sortedLabels: Label[] = this.labels
       .slice()
       .sort((a, b) => b.importance - a.importance);
@@ -173,9 +174,9 @@ export class TimelineComponent implements OnInit {
       if (label.year < this.minYear || label.year > this.maxYear) return;
 
       const maxImportance = 28000;
-      const minImportance = 600;
+      const minImportance = 500;
       const maxFontSize = 24;
-      const minFontSize = 9;
+      const minFontSize = 8;
       const fontSize = calcFontSize(
         label,
         maxImportance,
@@ -197,18 +198,18 @@ export class TimelineComponent implements OnInit {
   @HostListener('mousedown', ['$event'])
   onMouseDown(event: MouseEvent) {
     this.isDragging = true;
-    this.dragStartX = event.clientX;
-    this.dragStartY = event.clientY;
+    this.dragPrevX = this.dragStartX = event.clientX;
+    this.dragPrevY = this.dragStartY = event.clientY;
   }
 
   // Handle mouse move event to pan the timeline
   @HostListener('mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
     if (this.isDragging) {
-      const deltaX = event.clientX - this.dragStartX;
-      const deltaY = event.clientY - this.dragStartY;
-      this.dragStartX = event.clientX;
-      this.dragStartY = event.clientY;
+      const deltaX = event.clientX - this.dragPrevX;
+      const deltaY = event.clientY - this.dragPrevY;
+      this.dragPrevX = event.clientX;
+      this.dragPrevY = event.clientY;
 
       // Adjust the visible portion of the timeline based on deltaX
       const deltaYear = rescale(
@@ -233,12 +234,27 @@ export class TimelineComponent implements OnInit {
     }
   }
 
-  // Handle mouse up event to stop dragging
-  @HostListener('mouseup', ['$event'])
-  onMouseUp(event: MouseEvent) {
-    this.isDragging = false;
+  dragDistSq(event: MouseEvent): number {
+    const dx = event.clientX - this.dragStartX;
+    const dy = event.clientY - this.dragStartY;
+    return dx ** 2 + dy ** 2;
   }
 
+  // Handle mouse up event to stop dragging
+  @HostListener('document:mouseup', ['$event'])
+  @HostListener('document:mouseleave', ['$event'])
+  onMouseUp(event: MouseEvent) {
+    this.isDragging = false;
+    // Manually detect a click as opposed to a drag
+    const clickThreshSq = 1.0
+    if (this.dragDistSq(event) < clickThreshSq) {
+      if (!this.labels.some(label => label.openPageIfClicked(event.clientX, event.clientY))) {
+        let overlay = document.getElementById('overlay');
+        if (overlay) overlay.style.display = 'none';
+      }
+    }
+  }
+    
   // Handle mouse wheel events for zooming
   @HostListener('wheel', ['$event'])
   onMouseWheel(event: WheelEvent) {
@@ -254,12 +270,6 @@ export class TimelineComponent implements OnInit {
     this.drawTimeline();
     this.updateTimelineData();
     return false;
-  }
-
-  @HostListener('click', ['$event'])
-  onClick(event: MouseEvent) {
-    if (this.isDragging) return;
-    this.labels.forEach(label => label.openPageIfClicked(event.clientX, event.clientY));
   }
 
   private yearFromPixel(xInPixels: number): number {

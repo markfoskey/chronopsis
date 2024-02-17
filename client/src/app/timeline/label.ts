@@ -27,7 +27,7 @@ export class Label {
     this._y = event.location.y;
     this.ctx = ctx;
     this.textIncr = textHeight(this.ctx) + 3;
-    this.textLines = this.makeLabel(event, maxWidth);
+    this.textLines = this.makeLabel(maxWidth);
     this.calculateDimensions();
   }
 
@@ -108,10 +108,10 @@ export class Label {
     return lines;
   }
 
-  private makeLabel(event: EventData, maxWidth: number): string[] {
-    const titleLines = this.breakTextIntoLines(event.title, maxWidth);
+  private makeLabel(maxWidth: number): string[] {
+    const titleLines = this.breakTextIntoLines(this.event.title, maxWidth);
     const authorLines = this.breakTextIntoLines(
-      `${event.author}, ${event.year}`,
+      `${this.event.author}, ${this.event.year}, ${this.importance}`,
       maxWidth
     );
     return [...titleLines, ...authorLines];
@@ -147,8 +147,15 @@ export class Label {
     );
   }
 
-  overlaps(other: Label) {
+  overlapsInX(other: Label) {
     return Math.abs(this.x - other.x) < (this.width + other.width) / 2;
+  }
+
+  overlapsInY(other: Label) {
+    return (
+      Math.abs(this.y - other.y + (this.height - other.height) / 2) <
+      (this.height + other.height) / 2
+    );
   }
 
   setX(
@@ -158,20 +165,49 @@ export class Label {
     rightPixel: number
   ) {
     const yearWithDay: number = +this.year + +this.event.day_in_year / 365;
-
-
-    this._x = scaleAndShift(yearWithDay, minYear, maxYear, leftPixel, rightPixel);
-    console.log(`diy = ${this.event.day_in_year}, yearWithDay = ${yearWithDay}, this._x = ${this._x}`);
+    this._x = scaleAndShift(
+      yearWithDay,
+      minYear,
+      maxYear,
+      leftPixel,
+      rightPixel
+    );
+    console.log(
+      `diy = ${this.event.day_in_year}, yearWithDay = ${yearWithDay}, this._x = ${this._x}`
+    );
   }
 
-  setY(otherLabels: Label[], defaultY: number) {
+  setYstrict(otherLabels: Label[], defaultY: number) {
     const topY = otherLabels
       .filter((otherLabel: Label) => {
-        return this.overlaps(otherLabel);
+        return this.overlapsInX(otherLabel);
       })
       .reduce((currentVal, b) => Math.min(currentVal, b.y), defaultY);
 
     this.y = topY - this.height - 10;
+  }
+
+  setYfill(otherLabels: Label[], defaultY: number) {
+    const xOverlaps = otherLabels.filter((otherLabel: Label) => {
+      return this.overlapsInX(otherLabel);
+    });
+    this.y = defaultY - this.height - 10;
+    for (let i = 0; i < xOverlaps.length; i++) {
+      if (!xOverlaps.some((label: Label) => this.overlapsInY(label))) break;
+      this.y = xOverlaps[i].y - this.height - 10;
+    }
+  }
+
+  setYlinear(defaultY: number) {
+    const span = 2000;
+    const top = defaultY - span;
+    this.y = top + this.importance * (span / 28000);
+  }
+
+  setY(otherLabels: Label[], defaultY: number) {
+    this.setYstrict(otherLabels, defaultY);
+    // this.setYfill(otherLabels, defaultY);
+    // this.setYlinear(defaultY);
   }
 
   private drawTickmark(x: number, y: number) {
@@ -191,7 +227,7 @@ export class Label {
         this.x - this.width / 2,
         this.y,
         this.width,
-        this.textHeight
+        this.textHeight + 5
       );
       this.ctx.globalAlpha = 1.0;
     }
@@ -202,7 +238,10 @@ export class Label {
     this.textLines.forEach((row: string, index: number) => {
       this.ctx.fillText(row, this.x, this.y + (index + 1) * this.textIncr); // Adjust spacing as needed
     });
-    this.drawTickmark(this.x, this.y + numLines * this.textIncr + 0.5 * Label.vertLabelGap);
+    this.drawTickmark(
+      this.x,
+      this.y + numLines * this.textIncr + 0.5 * Label.vertLabelGap
+    );
     this.ctx.restore();
   }
 
@@ -220,9 +259,20 @@ export class Label {
     // console.log(`(${px}, ${py})`);
   }
 
+  // Function to open the Wikipedia article in the overlay
+  openOverlay(url: string) {
+    const overlay = document.getElementById('overlay');
+    if (!overlay) return;
+    overlay.innerHTML = `<iframe src="${url}" style="width: 100%; height: 100%; border: none;"></iframe>`;
+    overlay.style.display = 'block';
+  }
+
   openPageIfClicked(px: number, py: number) {
     if (this.containsPoint(px, py)) {
-      window.open(this.event.page_url);
+      // window.open(this.event.page_url);
+      this.openOverlay(this.event.page_url);
+      return true;
     }
+    return false;
   }
 }
