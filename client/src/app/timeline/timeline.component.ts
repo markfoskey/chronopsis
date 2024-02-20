@@ -23,12 +23,8 @@ export class TimelineComponent implements OnInit {
   private rightPixel = 0;
   private timelineY = 0;
   private labelBase = 0;
-  private tickRadius = 0;
-  private vertLabelGap = 0;
-  private horizLabelGap = 0;
   private minYear = 0;
   private maxYear = 0;
-  private maxWidth = 150;
   public currentEvent = {} as EventData;
 
   private canvas!: HTMLCanvasElement; // Canvas reference
@@ -42,9 +38,6 @@ export class TimelineComponent implements OnInit {
     this.rightPixel = this.canvas.width + 200;
     this.timelineY = this.canvas.height - 115;
     this.labelBase = this.timelineY - 5;
-    this.tickRadius = 3;
-    this.vertLabelGap = 36;
-    this.horizLabelGap = 8;
     this.minYear = 1800;
     this.maxYear = 1900;
 
@@ -73,14 +66,13 @@ export class TimelineComponent implements OnInit {
         }),
         catchError((error) => {
           console.error(error);
-          // Handle errors
           return EMPTY; // Returning an empty observable to swallow the error
         })
       )
       .subscribe((x) => {
         this.timelineData = x;
         this.labels = x.map((event: EventData) => {
-          return new Label(event, this.maxWidth, ctx);
+          return new Label(event, ctx);
         });
         this.drawTimeline();
       });
@@ -94,7 +86,6 @@ export class TimelineComponent implements OnInit {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     let overlay = document.getElementById('overlay');
-    overlay?.addEventListener('mouseup', (event) => { this.isDragging = false; })
   }
 
   private drawTimeline() {
@@ -173,19 +164,6 @@ export class TimelineComponent implements OnInit {
     sortedLabels.forEach((label, index) => {
       if (label.year < this.minYear || label.year > this.maxYear) return;
 
-      const maxImportance = 28000;
-      const minImportance = 500;
-      const maxFontSize = 24;
-      const minFontSize = 8;
-      const fontSize = calcFontSize(
-        label,
-        maxImportance,
-        minImportance,
-        maxFontSize,
-        minFontSize
-      );
-    
-      label.font = `${fontSize}px helvetica`;
       label.setX(this.minYear, this.maxYear, this.leftPixel, this.rightPixel);
       label.setY(shownLabels, this.labelBase);
 
@@ -200,6 +178,7 @@ export class TimelineComponent implements OnInit {
     this.isDragging = true;
     this.dragPrevX = this.dragStartX = event.clientX;
     this.dragPrevY = this.dragStartY = event.clientY;
+    this.canvas.classList.add('hand-cursor');
   }
 
   // Handle mouse move event to pan the timeline
@@ -241,10 +220,11 @@ export class TimelineComponent implements OnInit {
   }
 
   // Handle mouse up event to stop dragging
-  @HostListener('document:mouseup', ['$event'])
-  @HostListener('document:mouseleave', ['$event'])
+  @HostListener('mouseup', ['$event'])
+  @HostListener('mouseleave', ['$event'])
   onMouseUp(event: MouseEvent) {
     this.isDragging = false;
+    this.canvas.classList.remove('hand-cursor');
     // Manually detect a click as opposed to a drag
     const clickThreshSq = 1.0
     if (this.dragDistSq(event) < clickThreshSq) {

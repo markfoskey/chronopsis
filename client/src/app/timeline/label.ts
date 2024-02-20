@@ -1,13 +1,41 @@
 import { EventData } from './timeline-data.service';
 import { scaleAndShift, textHeight } from './timeline.utils';
 
+function calcSizeParams(
+  importance: number,
+  maxImportance: number,
+  minImportance: number,
+  maxFontSize: number,
+  minFontSize: number
+) {
+  const clampedImportance = Math.min(
+    Math.max(importance - minImportance, 0),
+    maxImportance
+  );
+  const importanceRange = maxImportance - minImportance;
+  const fontRange = maxFontSize - minFontSize;
+  const fontSize = Math.ceil(minFontSize + clampedImportance * (fontRange / importanceRange));
+  const minWidth = 120;
+  const widthRange = Label.maxWidth - minWidth;
+  const scaledMaxWidth = minWidth + clampedImportance * (widthRange / importanceRange);
+  return [fontSize, scaledMaxWidth];
+};
+
+// Represents a label for a novel
+// Will need to introduce polymorphism for other types of events
 export class Label {
   static vertLabelGap = 36;
   static horizLabelGap = 8;
   static tickRadius = 3;
+  static maxWidth = 150;
+  static maxImportance = 28000;
+  static minImportance = 500;
+  static maxFontSize = 24;
+  static minFontSize = 8;
   private event: EventData;
   private textLines: string[];
   private textIncr: number;
+  private scaledMaxWidth: number = Label.maxWidth;
   private _font: string = '10px arial';
   private _width: number = 50;
   private _textHeight: number = 30;
@@ -19,16 +47,24 @@ export class Label {
 
   constructor(
     event: EventData,
-    maxWidth: number,
     ctx: CanvasRenderingContext2D
   ) {
     this.event = event;
     this._x = event.location.x;
     this._y = event.location.y;
     this.ctx = ctx;
+    const [fontSize, scaledMaxWidth] = calcSizeParams(
+      this.importance,
+      Label.maxImportance,
+      Label.minImportance,
+      Label.maxFontSize,
+      Label.minFontSize
+    );
+    
+    this.scaledMaxWidth = scaledMaxWidth;
     this.textIncr = textHeight(this.ctx) + 3;
-    this.textLines = this.makeLabel(maxWidth);
-    this.calculateDimensions();
+    this.textLines = this.makeLabel(this.scaledMaxWidth);
+    this.font = `${fontSize}px helvetica`;
   }
 
   get importance() {
@@ -67,12 +103,12 @@ export class Label {
     return this._y;
   }
 
-  set font(fontStr: string) {
+set font(fontStr: string) {
     this.ctx.save();
     this._font = fontStr;
     this.ctx.font = fontStr;
     this.textIncr = textHeight(this.ctx);
-    this.calculateDimensions();
+    if(this.textLines) this.calculateDimensions();
     this.ctx.restore();
   }
 
@@ -111,7 +147,7 @@ export class Label {
   private makeLabel(maxWidth: number): string[] {
     const titleLines = this.breakTextIntoLines(this.event.title, maxWidth);
     const authorLines = this.breakTextIntoLines(
-      `${this.event.author}, ${this.event.year}, ${this.importance}`,
+      `${this.event.author}, ${this.event.year}`,
       maxWidth
     );
     return [...titleLines, ...authorLines];
@@ -172,9 +208,6 @@ export class Label {
       leftPixel,
       rightPixel
     );
-    console.log(
-      `diy = ${this.event.day_in_year}, yearWithDay = ${yearWithDay}, this._x = ${this._x}`
-    );
   }
 
   setYstrict(otherLabels: Label[], defaultY: number) {
@@ -187,6 +220,7 @@ export class Label {
     this.y = topY - this.height - 10;
   }
 
+  // Probably remove
   setYfill(otherLabels: Label[], defaultY: number) {
     const xOverlaps = otherLabels.filter((otherLabel: Label) => {
       return this.overlapsInX(otherLabel);
@@ -198,6 +232,7 @@ export class Label {
     }
   }
 
+  // Probably remove
   setYlinear(defaultY: number) {
     const span = 2000;
     const top = defaultY - span;
@@ -206,8 +241,6 @@ export class Label {
 
   setY(otherLabels: Label[], defaultY: number) {
     this.setYstrict(otherLabels, defaultY);
-    // this.setYfill(otherLabels, defaultY);
-    // this.setYlinear(defaultY);
   }
 
   private drawTickmark(x: number, y: number) {
@@ -220,7 +253,6 @@ export class Label {
   draw() {
     this.ctx.save();
     if (this._mouseover) {
-      console.log(this.event.title);
       this.ctx.fillStyle = 'lightGray';
       this.ctx.globalAlpha = 0.5;
       this.ctx.fillRect(
@@ -236,7 +268,7 @@ export class Label {
     this.ctx.font = this.font;
     const numLines = this.textLines.length;
     this.textLines.forEach((row: string, index: number) => {
-      this.ctx.fillText(row, this.x, this.y + (index + 1) * this.textIncr); // Adjust spacing as needed
+      this.ctx.fillText(row, this.x, this.y + (index + 1) * this.textIncr);
     });
     this.drawTickmark(
       this.x,
@@ -256,10 +288,9 @@ export class Label {
 
   setMouseover(px: number, py: number) {
     this._mouseover = this.containsPoint(px, py);
-    // console.log(`(${px}, ${py})`);
   }
 
-  // Function to open the Wikipedia article in the overlay
+  // Open a web page in the overlay element (intended to be the Wikipedia article)
   openOverlay(url: string) {
     const overlay = document.getElementById('overlay');
     if (!overlay) return;
@@ -269,7 +300,6 @@ export class Label {
 
   openPageIfClicked(px: number, py: number) {
     if (this.containsPoint(px, py)) {
-      // window.open(this.event.page_url);
       this.openOverlay(this.event.page_url);
       return true;
     }

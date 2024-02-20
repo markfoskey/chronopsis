@@ -7,13 +7,19 @@ canvas {
     display: block;
 }
 
+.hand-cursor {
+  cursor: grab;
+}
+
+/* Overlay containing the Wikipedia article of the clicked item */
 #overlay {
     position: fixed;
     top: 0;
     left: 0;
-    width: 33%; /* Adjust as needed */
+    width: 33%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
     display: none; /* Initially hidden */
     z-index: 1000; /* Ensure it appears above other content */
+    pointer-events: none; /* Let main timeline handle the events. */
 }
