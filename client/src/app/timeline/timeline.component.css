@@ -21,5 +21,4 @@ canvas {
     background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
     display: none; /* Initially hidden */
     z-index: 1000; /* Ensure it appears above other content */
-    pointer-events: none; /* Let main timeline handle the events. */
 }

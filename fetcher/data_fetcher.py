@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from dateutil import parser as date_parser
 from mediawiki import MediaWiki
 from pprint import pprint
+from date_fixer import get_date
 
 global_count = 0
 found_urls = set()
@@ -92,19 +93,16 @@ def get_page_info(page):
 
     try:
         parsed_date = date_parser.parse(pubdate, fuzzy=True)
-        year = parsed_date.year
-        day_in_year = parsed_date.timetuple().tm_yday
+        year, day_in_year = get_date(pubdate)
     except Exception as e:
         print(f"Problem parsing pubdate for {title}; grabbing first four digit string")
         year = extract_year(pubdate)
-        day_in_year = 1
+        day_in_year = 183
 
     article_length = len(content.split())  # Simple word count
     
     page_title = page.url.split('/')[-1]
-    print(page_title)
     in_links = num_inbound_links(page_title)
-    print(in_links)
 
     return [title, author, year, day_in_year, pubdate, genre, country, in_links, article_length, page.title, page.url]
     
@@ -122,7 +120,6 @@ def scrape_listed_pages(links, completed_links, wiki_wiki, csv_writer):
             if row:
                 global global_count
                 global_count = global_count + 1
-                print(f"{row[0]}, {row[3]}, {global_count}")
                 csv_writer.writerow(row)
             else:
                 csv_writer.writerow(['', '', '', '', '', '', '', '', '', link, ''])

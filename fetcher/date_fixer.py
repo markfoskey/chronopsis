@@ -62,10 +62,10 @@ def update_year(row):
 
 # Apply the update_year function to each row and create a new DataFrame
 # df_updated = df.apply(lambda row: update_year(row), axis=1)
-df_updated = df.apply(update_year, axis=1)
+# df_updated = df.apply(update_year, axis=1)
 
 # Reorder columns
-df_updated = df_updated[['author', 'title', 'year', 'article_length', 'pubdate']]
+# df_updated = df_updated[['author', 'title', 'year', 'article_length', 'pubdate']]
 
 # Save the updated DataFrame to a new CSV file
-df_updated.to_csv(outfile, index=False, encoding='utf-8')
+# df_updated.to_csv(outfile, index=False, encoding='utf-8')
