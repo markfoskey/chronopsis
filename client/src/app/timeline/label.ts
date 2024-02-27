@@ -1,4 +1,4 @@
-import { EventData } from './timeline-data.service';
+import { TimelineData, EventData, AuthorTitleEventData } from './timeline-data.service';
 import { scaleAndShift, textHeight } from './timeline.utils';
 
 function calcSizeParams(
@@ -32,7 +32,7 @@ export class Label {
   static minImportance = 500;
   static maxFontSize = 24;
   static minFontSize = 8;
-  private event: EventData;
+  private data: EventData;
   private textLines: string[];
   private textIncr: number;
   private scaledMaxWidth: number = Label.maxWidth;
@@ -45,13 +45,10 @@ export class Label {
   private _mouseover: boolean = false;
   private ctx: CanvasRenderingContext2D;
 
-  constructor(
-    event: EventData,
-    ctx: CanvasRenderingContext2D
-  ) {
-    this.event = event;
-    this._x = event.location.x;
-    this._y = event.location.y;
+  constructor(data: EventData, ctx: CanvasRenderingContext2D) {
+    this.data = data;
+    this._x = 0;
+    this._y = 0;
     this.ctx = ctx;
     const [fontSize, scaledMaxWidth] = calcSizeParams(
       this.importance,
@@ -60,19 +57,19 @@ export class Label {
       Label.maxFontSize,
       Label.minFontSize
     );
-    
+
     this.scaledMaxWidth = scaledMaxWidth;
     this.textIncr = textHeight(this.ctx) + 3;
-    this.textLines = this.makeLabel(this.scaledMaxWidth);
+    this.textLines = this.makeLabel(this.data, this.scaledMaxWidth);
     this.font = `${fontSize}px helvetica`;
   }
 
   get importance() {
-    return this.event.article_length;
+    return this.data.article_length;
   }
 
   get year() {
-    return this.event.year;
+    return this.data.year;
   }
 
   get width() {
@@ -103,12 +100,12 @@ export class Label {
     return this._y;
   }
 
-set font(fontStr: string) {
+  set font(fontStr: string) {
     this.ctx.save();
     this._font = fontStr;
     this.ctx.font = fontStr;
     this.textIncr = textHeight(this.ctx);
-    if(this.textLines) this.calculateDimensions();
+    if (this.textLines) this.calculateDimensions();
     this.ctx.restore();
   }
 
@@ -144,13 +141,25 @@ set font(fontStr: string) {
     return lines;
   }
 
-  private makeLabel(maxWidth: number): string[] {
-    const titleLines = this.breakTextIntoLines(this.event.title, maxWidth);
-    const authorLines = this.breakTextIntoLines(
-      `${this.event.author}, ${this.event.year}`,
-      maxWidth
-    );
-    return [...titleLines, ...authorLines];
+  private makeLabel(
+    data: AuthorTitleEventData | EventData,
+    maxWidth: number
+  ): string[] {
+    if ('author' in data && 'title' in data) {
+      const titleLines = this.breakTextIntoLines(data.title, maxWidth);
+      const authorLines = this.breakTextIntoLines(
+        `${data.author}, ${data.year}`,
+        maxWidth
+      );
+      return [...titleLines, ...authorLines];
+    } else {
+      const descriptionLines = this.breakTextIntoLines(
+        data.description,
+        maxWidth
+      );
+      const yearLine = `${data.year}`;
+      return [...descriptionLines, yearLine];
+    }
   }
 
   private calculateDimensions() {
@@ -200,7 +209,7 @@ set font(fontStr: string) {
     leftPixel: number,
     rightPixel: number
   ) {
-    const yearWithDay: number = +this.year + +this.event.day_in_year / 365;
+    const yearWithDay: number = +this.year + +this.data.day_in_year / 365;
     this._x = scaleAndShift(
       yearWithDay,
       minYear,
@@ -220,13 +229,13 @@ set font(fontStr: string) {
     this.y = topY - this.height - 10;
   }
 
-  // Probably remove
   setYfill(otherLabels: Label[], defaultY: number) {
     const xOverlaps = otherLabels.filter((otherLabel: Label) => {
       return this.overlapsInX(otherLabel);
     });
     this.y = defaultY - this.height - 10;
     for (let i = 0; i < xOverlaps.length; i++) {
+      if (xOverlaps[i].y - this.height - 10 > defaultY) continue;
       if (!xOverlaps.some((label: Label) => this.overlapsInY(label))) break;
       this.y = xOverlaps[i].y - this.height - 10;
     }
@@ -240,7 +249,10 @@ set font(fontStr: string) {
   }
 
   setY(otherLabels: Label[], defaultY: number) {
-    this.setYstrict(otherLabels, defaultY);
+    if ('author' in this.data)
+      this.setYstrict(otherLabels, defaultY);
+    else
+      this.setYfill(otherLabels, defaultY - 2000);
   }
 
   private drawTickmark(x: number, y: number) {
@@ -264,7 +276,14 @@ set font(fontStr: string) {
       this.ctx.globalAlpha = 1.0;
     }
     this.ctx.textAlign = 'center';
-    this.ctx.fillStyle = this.hashStringToColor(this.event.author);
+    if ('author' in this.data) {
+      const authorTitleEvent = this.data as AuthorTitleEventData;
+      this.ctx.fillStyle = this.hashStringToColor(authorTitleEvent.author);
+    }
+    else
+    {
+      this.ctx.fillStyle = 'black';
+    }
     this.ctx.font = this.font;
     const numLines = this.textLines.length;
     this.textLines.forEach((row: string, index: number) => {
@@ -300,7 +319,7 @@ set font(fontStr: string) {
 
   openPageIfClicked(px: number, py: number) {
     if (this.containsPoint(px, py)) {
-      this.openOverlay(this.event.page_url);
+      this.openOverlay(this.data.page_url);
       return true;
     }
     return false;

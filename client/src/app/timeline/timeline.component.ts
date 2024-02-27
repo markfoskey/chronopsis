@@ -5,6 +5,7 @@ import { catchError, map, min } from 'rxjs/operators';
 import { EMPTY } from 'rxjs';
 import { rescale, scaleAndShift } from './timeline.utils';
 
+// Class for a timeline that can be zoomed and panned. 
 @Component({
   selector: 'app-timeline',
   templateUrl: './timeline.component.html',
@@ -56,14 +57,8 @@ export class TimelineComponent implements OnInit {
     let beginYear = this.minYear - padding;
     let endYear = this.maxYear + padding;
     this.timelineDataService
-      .getEvents(beginYear, endYear, 0, 10, 1000)
+      .getEvents(beginYear, endYear, 1000)
       .pipe(
-        map((data) => {
-          data.map((event: EventData) => {
-            event.location = { x: 0, y: 0 };
-          });
-          return data;
-        }),
         catchError((error) => {
           console.error(error);
           return EMPTY; // Returning an empty observable to swallow the error
@@ -79,7 +74,6 @@ export class TimelineComponent implements OnInit {
   }
 
   private setupCanvas() {
-    // Retrieve the canvas element and store the reference
     this.canvas = document.getElementById(
       'timelineCanvas'
     ) as HTMLCanvasElement;
@@ -111,8 +105,13 @@ export class TimelineComponent implements OnInit {
         this.rightPixel
       );
       ctx.fillRect(startX, 0, widthInPixels, this.canvas.height);
+    };
 
-      // Print the year at the beginning of the band
+    const printYear = (
+      startX: number,
+      width: number,
+      year: string
+    ) => {
       ctx.save();
       ctx.fillStyle = 'black';
       ctx.textAlign = 'start';
@@ -135,11 +134,10 @@ export class TimelineComponent implements OnInit {
     for (let i = firstBandStart; i < lastBandEnd; i++) {
       const startX = this.pixelFromYear(i * bandWidth);
       const year = (i * bandWidth).toString();
-      const color = i % 2 === 0 ? 'lightCyan' : 'white'; // Alternating blue and white bands
+      const color = i % 2 === 0 ? 'lightCyan' : 'white';
       drawBand(startX, bandWidth, year, color);
     }
 
-    // Sort labels in decreasing order of importance
     const sortedLabels: Label[] = this.labels
       .slice()
       .sort((a, b) => b.importance - a.importance);
@@ -170,9 +168,16 @@ export class TimelineComponent implements OnInit {
       label.draw();
       shownLabels.push(label);
     });
+
+    // This is separated from the color band rendering because we want the years to be on top
+    for (let i = firstBandStart; i < lastBandEnd; i++) {
+      const startX = this.pixelFromYear(i * bandWidth);
+      const year = (i * bandWidth).toString();
+      printYear(startX, bandWidth, year);
+    }
+
   }
 
-  // Handle mouse down event to initiate dragging
   @HostListener('mousedown', ['$event'])
   onMouseDown(event: MouseEvent) {
     this.isDragging = true;
@@ -181,7 +186,6 @@ export class TimelineComponent implements OnInit {
     this.canvas.classList.add('hand-cursor');
   }
 
-  // Handle mouse move event to pan the timeline
   @HostListener('mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
     if (this.isDragging) {
@@ -190,7 +194,7 @@ export class TimelineComponent implements OnInit {
       this.dragPrevX = event.clientX;
       this.dragPrevY = event.clientY;
 
-      // Adjust the visible portion of the timeline based on deltaX
+      // Panning changes the range of visible years; handle that.
       const deltaYear = rescale(
         deltaX,
         this.leftPixel,
@@ -219,7 +223,6 @@ export class TimelineComponent implements OnInit {
     return dx ** 2 + dy ** 2;
   }
 
-  // Handle mouse up event to stop dragging
   @HostListener('mouseup', ['$event'])
   @HostListener('mouseleave', ['$event'])
   onMouseUp(event: MouseEvent) {
@@ -235,7 +238,6 @@ export class TimelineComponent implements OnInit {
     }
   }
     
-  // Handle mouse wheel events for zooming
   @HostListener('wheel', ['$event'])
   onMouseWheel(event: WheelEvent) {
     // Scrolling up --> zooming in --> min and max years closer together
@@ -246,7 +248,6 @@ export class TimelineComponent implements OnInit {
     this.minYear += zoomMultiplier * (wheelStartYear - this.minYear);
     this.maxYear += zoomMultiplier * (wheelStartYear - this.maxYear);
 
-    // Redraw the timeline with the updated scale
     this.drawTimeline();
     this.updateTimelineData();
     return false;
