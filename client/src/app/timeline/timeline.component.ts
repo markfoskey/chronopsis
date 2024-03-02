@@ -107,11 +107,7 @@ export class TimelineComponent implements OnInit {
       ctx.fillRect(startX, 0, widthInPixels, this.canvas.height);
     };
 
-    const printYear = (
-      startX: number,
-      width: number,
-      year: string
-    ) => {
+    const printYear = (startX: number, width: number, year: string) => {
       ctx.save();
       ctx.fillStyle = 'black';
       ctx.textAlign = 'start';
@@ -143,22 +139,6 @@ export class TimelineComponent implements OnInit {
       .sort((a, b) => b.importance - a.importance);
     let shownLabels: Label[] = [];
 
-    const calcFontSize = (
-      label: Label,
-      maxImportance: number,
-      minImportance: number,
-      maxFontSize: number,
-      minFontSize: number
-    ) => {
-      const clampedImportance = Math.min(
-        Math.max(label.importance - minImportance, 0),
-        maxImportance
-      );
-      const importanceRange = maxImportance - minImportance;
-      const fontRange = maxFontSize - minFontSize;
-      return Math.ceil(minFontSize + clampedImportance * (fontRange / importanceRange));
-    };
-
     sortedLabels.forEach((label, index) => {
       if (label.year < this.minYear || label.year > this.maxYear) return;
 
@@ -175,47 +155,102 @@ export class TimelineComponent implements OnInit {
       const year = (i * bandWidth).toString();
       printYear(startX, bandWidth, year);
     }
+  }
 
+  startDrag(x: number, y: number) {
+    this.isDragging = true;
+    this.dragPrevX = this.dragStartX = x;
+    this.dragPrevY = this.dragStartY = y;
+  }
+
+  @HostListener('touchstart', ['$event'])
+  onTouchStart(event: TouchEvent) {
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      this.startDrag(touch.clientX, touch.clientY);
+    }
   }
 
   @HostListener('mousedown', ['$event'])
   onMouseDown(event: MouseEvent) {
-    this.isDragging = true;
-    this.dragPrevX = this.dragStartX = event.clientX;
-    this.dragPrevY = this.dragStartY = event.clientY;
+    this.startDrag(event.clientX, event.clientY);
     this.canvas.classList.add('hand-cursor');
+  }
+
+  panTimeline(x: number, y: number)
+  {
+    const deltaX = x - this.dragPrevX;
+    const deltaY = y - this.dragPrevY;
+    this.dragPrevX = x;
+    this.dragPrevY = y;
+
+    // Panning changes the range of visible years; handle that.
+    const deltaYear = rescale(
+      deltaX,
+      this.leftPixel,
+      this.rightPixel,
+      this.minYear,
+      this.maxYear
+    );
+    this.minYear -= deltaYear;
+    this.maxYear -= deltaYear;
+
+    this.labelBase += deltaY;
+
+    // Redraw the timeline with the updated visible portion
+    this.drawTimeline();
+    this.updateTimelineData();  
+  }
+
+  @HostListener('touchmove', ['$event'])
+  onTouchMove(event: TouchEvent) {
+    if (this.isDragging && event.touches.length === 1) {
+      const touch = event.touches[0];
+      this.panTimeline(touch.clientX, touch.clientY);
+    }
   }
 
   @HostListener('mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
     if (this.isDragging) {
-      const deltaX = event.clientX - this.dragPrevX;
-      const deltaY = event.clientY - this.dragPrevY;
-      this.dragPrevX = event.clientX;
-      this.dragPrevY = event.clientY;
-
-      // Panning changes the range of visible years; handle that.
-      const deltaYear = rescale(
-        deltaX,
-        this.leftPixel,
-        this.rightPixel,
-        this.minYear,
-        this.maxYear
+      this.panTimeline(event.clientX, event.clientY);
+    } else {
+      this.labels.forEach((label: Label) =>
+        label.setMouseover(event.clientX, event.clientY)
       );
-      this.minYear -= deltaYear;
-      this.maxYear -= deltaYear;
-
-      this.labelBase += deltaY;
-
-      // Redraw the timeline with the updated visible portion
-      this.drawTimeline();
-      this.updateTimelineData();
-    }
-    else {
-      this.labels.forEach((label: Label) => label.setMouseover(event.clientX, event.clientY));
       this.drawTimeline();
     }
   }
+
+  // @HostListener('gesturechange', ['$event'])
+  // onGestureChange(event: GestureEvent) {
+  //   // Handle pinch zooming
+  // }
+
+  @HostListener('touchend', ['$event'])
+  onTouchEnd(event: TouchEvent) {
+    if (event.changedTouches.length === 1) {
+      const touch = event.changedTouches[0];
+      if (this.isDragging) {
+        // Check if it's a tap or drag
+        const dragDistance = Math.sqrt(
+          (touch.clientX - this.dragStartX) ** 2 +
+            (touch.clientY - this.dragStartY) ** 2
+        );
+        if (dragDistance < 10) {
+          // Adjust this threshold as needed
+          // Handle tap to open links
+        }
+      }
+      this.isDragging = false;
+      this.canvas.classList.remove('hand-cursor');
+    }
+  }
+
+  // @HostListener('gestureend', ['$event'])
+  // onGestureEnd(event: GestureEvent) {
+  //   // Handle end of pinch gesture
+  // }
 
   dragDistSq(event: MouseEvent): number {
     const dx = event.clientX - this.dragStartX;
@@ -229,15 +264,19 @@ export class TimelineComponent implements OnInit {
     this.isDragging = false;
     this.canvas.classList.remove('hand-cursor');
     // Manually detect a click as opposed to a drag
-    const clickThreshSq = 1.0
+    const clickThreshSq = 1.0;
     if (this.dragDistSq(event) < clickThreshSq) {
-      if (!this.labels.some(label => label.openPageIfClicked(event.clientX, event.clientY))) {
+      if (
+        !this.labels.some((label) =>
+          label.openPageIfClicked(event.clientX, event.clientY)
+        )
+      ) {
         let overlay = document.getElementById('overlay');
         if (overlay) overlay.style.display = 'none';
       }
     }
   }
-    
+
   @HostListener('wheel', ['$event'])
   onMouseWheel(event: WheelEvent) {
     // Scrolling up --> zooming in --> min and max years closer together
@@ -272,5 +311,4 @@ export class TimelineComponent implements OnInit {
       this.rightPixel
     );
   }
-
 }

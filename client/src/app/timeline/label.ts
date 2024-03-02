@@ -65,7 +65,8 @@ export class Label {
   }
 
   get importance() {
-    return this.data.article_length;
+    const rawVal = this.data.article_length;
+    return ('author' in this.data ? rawVal : rawVal / 2);
   }
 
   get year() {
@@ -252,7 +253,7 @@ export class Label {
     if ('author' in this.data)
       this.setYstrict(otherLabels, defaultY);
     else
-      this.setYfill(otherLabels, defaultY - 2000);
+      this.setYstrict(otherLabels, defaultY);
   }
 
   private drawTickmark(x: number, y: number) {

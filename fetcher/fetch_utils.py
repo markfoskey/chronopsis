@@ -1,5 +1,18 @@
 import re
+import inspect
 from dateutil import parser as date_parser
+
+from urllib.parse import urlparse
+
+def print_object_members(obj):
+    members = inspect.getmembers(obj)
+    for name, member in members:
+        print(name)
+
+def extract_leaf(url):
+    parsed_url = urlparse(url)
+    path_components = parsed_url.path.split('/')
+    return path_components[-1] if path_components[-1] else path_components[-2]    
 
 # Function to extract the first contiguous four digits from a string
 def extract_year(date_string):

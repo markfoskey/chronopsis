@@ -1,20 +1,11 @@
 import argparse
 import csv
-import inspect
-import re
-import requests
-import time
 from dateutil import parser as date_parser
 from mediawiki import MediaWiki
 from pprint import pprint
 
 global_count = 0
 found_urls = set()
-
-def print_object_members(obj):
-    members = inspect.getmembers(obj)
-    for name, member in members:
-        print(name)
 
 def get_row_headers():
     return ['title', 'author', 'year', 'day_in_year', 'pubdate', 'genre', 'country', 'in_links', 'article_length', 'page_url']
@@ -50,7 +41,7 @@ def process_file(input_filename, output_filename):
         pass
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Scrape Wikipedia pages.")
+    parser = argparse.ArgumentParser(description="Template for tweaking csv file.")
     parser.add_argument("input_file", help="csv file to modify.")
     parser.add_argument("output_file", help="output file.")
     args = parser.parse_args()

@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from dateutil import parser as date_parser
 from mediawiki import MediaWiki
 from pprint import pprint
-from date_fixer import get_date
+from fetcher.fetch_utils import get_date
 
 global_count = 0
 found_urls = set()
@@ -47,7 +47,7 @@ def extract_year(s):
 def get_page_info(page):
     title = page.title
     # print_object_members(page)
-    content = page.html  # Use page.html instead of page.content
+    content = page.html
 
     soup = BeautifulSoup(content, 'html.parser')
 
@@ -99,7 +99,7 @@ def get_page_info(page):
         year = extract_year(pubdate)
         day_in_year = 183
 
-    article_length = len(content.split())  # Simple word count
+    article_length = len(content.split())
     
     page_title = page.url.split('/')[-1]
     in_links = num_inbound_links(page_title)

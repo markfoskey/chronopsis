@@ -6,7 +6,7 @@ from flask_cors import CORS, cross_origin
 
 import sys
 sys.path.insert(1, '../fetcher/')
-from date_fixer import get_date
+from fetch_utils import get_date
 
 app = Flask(__name__)
 CORS(app)
